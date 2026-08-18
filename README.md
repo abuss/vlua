@@ -89,6 +89,25 @@ Notes: string keys map to `children`; integer keys `1..#t` map to `array`;
 trailing `nil` array slots are not materialized; `get_global_value` errors on a
 missing/nil global, while the typed helpers return empty containers.
 
+### Calling Lua functions from V
+
+```v
+greets := call_function(l, 'greet', [LuaValue{kind: .string, str: 'world'}]) or {
+    eprintln('error: $err')
+}
+println(greets[0].str) // "Hello, world!"
+
+// multiple return values are preserved in order
+res := call_function(l, 'pair', [
+    LuaValue{kind: .number, num: 3.0},
+    LuaValue{kind: .number, num: 4.0},
+]) or { panic(err) } // res[0] == 7.0, res[1] == 12.0
+```
+
+`call_function` takes the global function name (no dotted paths such as
+`math.max`) and a `[]LuaValue` of arguments, and returns the values in order.
+It errors if the global is not a function or the call raises an error.
+
 ## Build & Test
 
 ```sh

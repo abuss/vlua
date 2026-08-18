@@ -283,3 +283,64 @@ fn test_missing_table_returns_empty() {
 	}
 	assert C.lua_gettop(l) == 0
 }
+
+fn test_call_function() {
+	l := new_state() or { panic('Failed to create Lua state') }
+	defer {
+		close_state(l)
+	}
+
+	register_function(l, 'v_add', lua_add)
+	res := call_function(l, 'v_add', [
+		LuaValue{kind: .number, num: 20.0},
+		LuaValue{kind: .number, num: 22.0},
+	]) or { panic(err) }
+	assert res.len == 1
+	assert res[0].kind == .number
+	assert res[0].num == 42.0
+
+	safe_dostring(l, 'function pair(a, b) return a + b, a * b end') or {
+		panic('Failed to define function: $err')
+	}
+	multi := call_function(l, 'pair', [
+		LuaValue{kind: .number, num: 3.0},
+		LuaValue{kind: .number, num: 4.0},
+	]) or { panic(err) }
+	assert multi.len == 2
+	assert multi[0].num == 7.0
+	assert multi[1].num == 12.0
+
+	safe_dostring(l, 'function hi() return "hi" end') or {
+		panic('Failed to define function: $err')
+	}
+	noargs := call_function(l, 'hi', []) or { panic(err) }
+	assert noargs.len == 1
+	assert noargs[0].str == 'hi'
+	assert C.lua_gettop(l) == 0
+}
+
+fn test_call_function_errors() {
+	l := new_state() or { panic('Failed to create Lua state') }
+	defer {
+		close_state(l)
+	}
+
+	safe_dostring(l, 'function boom() error("kaboom") end') or {
+		panic('Failed to define function: $err')
+	}
+	if _ := call_function(l, 'boom', []) {
+		panic('Expected error from boom')
+	} else {
+		assert err.msg().contains('kaboom')
+	}
+
+	set_global_number(l, 'not_a_func', 5.0)
+	if _ := call_function(l, 'not_a_func', []) {
+		panic('Expected error for non-function')
+	}
+
+	if _ := call_function(l, 'does_not_exist', []) {
+		panic('Expected error for missing global')
+	}
+	assert C.lua_gettop(l) == 0
+}

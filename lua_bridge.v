@@ -20,22 +20,17 @@ fn C.luaL_dofile(L voidptr, filename &char) int
 fn C.lua_pcall(L voidptr, nargs int, nresults int, errfunc int) int
 fn C.lua_getglobal(L voidptr, name &char)
 fn C.lua_setglobal(L voidptr, name &char)
-fn C.lua_getfield(L voidptr, idx int, k &char)
 fn C.lua_setfield(L voidptr, idx int, k &char)
 fn C.lua_newtable(L voidptr)
 fn C.lua_next(L voidptr, idx int) int
 fn C.lua_type(L voidptr, idx int) int
 fn C.lua_tonumber(L voidptr, idx int) f64
 fn C.lua_tostring(L voidptr, idx int) &char
-fn C.lua_isnumber(L voidptr, idx int) int
-fn C.lua_isstring(L voidptr, idx int) int
 fn C.lua_istable(L voidptr, idx int) int
 fn C.lua_isnil(L voidptr, idx int) int
-fn C.lua_isboolean(L voidptr, idx int) int
 fn C.lua_pop(L voidptr, n int)
 fn C.lua_pushnil(L voidptr)
 fn C.lua_pushnumber(L voidptr, n f64)
-fn C.lua_pushinteger(L voidptr, n i64)
 fn C.lua_pushstring(L voidptr, s &char)
 fn C.lua_pushboolean(L voidptr, b bool)
 fn C.lua_pushcfunction(L voidptr, f fn (voidptr) int)

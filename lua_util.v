@@ -9,6 +9,8 @@ const lua_tboolean = 1
 const lua_tnumber = 3
 const lua_tstring = 4
 const lua_ttable = 5
+const lua_tfunction = 6
+const lua_multret = -1
 
 // General value type for heterogeneous/nested Lua tables.
 enum LuaValueKind {
@@ -122,20 +124,20 @@ pub fn set_global_number(l voidptr, name string, value f64) {
 	C.lua_setglobal(l, name.str)
 }
 
-// Read the value at the top of the Lua stack into a LuaValue without
-// popping it. Recurses into tables; non-string/number/bool/table values
-// fall back to LuaValue kind `.number` with value 0.
-fn read_value_at_top(l voidptr) LuaValue {
-	typ := C.lua_type(l, -1)
+// Read the value at Lua stack index `idx` into a LuaValue without popping
+// it. Recurses into tables; non-string/number/bool/table values fall back to
+// LuaValue kind `.number` with value 0.
+fn read_value_at(l voidptr, idx int) LuaValue {
+	typ := C.lua_type(l, idx)
 	match typ {
 		lua_tnumber {
 			return LuaValue{
 				kind: .number
-				num:  C.lua_tonumber(l, -1)
+				num:  C.lua_tonumber(l, idx)
 			}
 		}
 		lua_tstring {
-			s := C.lua_tostring(l, -1)
+			s := C.lua_tostring(l, idx)
 			return LuaValue{
 				kind: .string
 				str:  unsafe { cstring_to_vstring(*s) }
@@ -144,11 +146,15 @@ fn read_value_at_top(l voidptr) LuaValue {
 		lua_tboolean {
 			return LuaValue{
 				kind: .boolean
-				b:    C.lua_toboolean(l, -1) != 0
+				b:    C.lua_toboolean(l, idx) != 0
 			}
 		}
 		lua_ttable {
-			tb := C.lua_gettop(l)
+			tb := if idx < 0 {
+				C.lua_gettop(l) + idx + 1
+			} else {
+				idx
+			}
 			mut v := LuaValue{
 				kind:     .table
 				children: map[string]LuaValue{}
@@ -160,14 +166,14 @@ fn read_value_at_top(l voidptr) LuaValue {
 					C.lua_pop(l, 1)
 					continue
 				}
-				v.array << read_value_at_top(l)
+				v.array << read_value_at(l, -1)
 				C.lua_pop(l, 1)
 			}
 			C.lua_pushnil(l)
 			for C.lua_next(l, tb) != 0 {
 				if C.lua_type(l, -2) == lua_tstring {
 					ks := C.lua_tostring(l, -2)
-					v.children[unsafe { cstring_to_vstring(*ks) }] = read_value_at_top(l)
+					v.children[unsafe { cstring_to_vstring(*ks) }] = read_value_at(l, -1)
 				}
 				C.lua_pop(l, 1)
 			}
@@ -177,6 +183,11 @@ fn read_value_at_top(l voidptr) LuaValue {
 			return LuaValue{}
 		}
 	}
+}
+
+// Read the value at the top of the Lua stack without popping it.
+fn read_value_at_top(l voidptr) LuaValue {
+	return read_value_at(l, -1)
 }
 
 // Push a LuaValue onto the Lua stack (recurses into tables).
@@ -351,4 +362,29 @@ pub fn get_global_value(l voidptr, name string) !LuaValue {
 pub fn set_global_value(l voidptr, name string, v LuaValue) {
 	push_value(l, v)
 	C.lua_setglobal(l, name.str)
+}
+
+// Call a global Lua function with the given arguments and collect its
+// return values. Errors if the global is not a function or the call fails.
+pub fn call_function(l voidptr, name string, args []LuaValue) ![]LuaValue {
+	C.lua_getglobal(l, name.str)
+	if C.lua_type(l, -1) != lua_tfunction {
+		C.lua_pop(l, 1)
+		return error('global "$name" is not a function')
+	}
+	for a in args {
+		push_value(l, a)
+	}
+	if C.lua_pcall(l, args.len, lua_multret, 0) != 0 {
+		msg := lua_error_msg(l)
+		C.lua_pop(l, 1)
+		return error(msg)
+	}
+	mut results := []LuaValue{}
+	n := C.lua_gettop(l)
+	for i := -n; i <= -1; i++ {
+		results << read_value_at(l, i)
+	}
+	C.lua_pop(l, n)
+	return results
 }
