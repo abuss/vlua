@@ -12,3 +12,11 @@ pi = 3.14159
 function greet(who)
 	return "Hello, " .. who .. "!"
 end
+
+-- A heterogeneous, nested table read by Demo 6 via get_global_value.
+config = {
+	name = "vlua",
+	version = 6.2,
+	features = { "auto", "lua" },
+	tags = { 10, 20, 30 },
+}

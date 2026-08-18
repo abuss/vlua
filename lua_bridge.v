@@ -41,4 +41,6 @@ fn C.lua_pushboolean(L voidptr, b bool)
 fn C.lua_pushcfunction(L voidptr, f fn (voidptr) int)
 fn C.lua_toboolean(L voidptr, idx int) int
 fn C.lua_gettop(L voidptr) int
-fn C.lua_objlen(L voidptr, idx int) int
+fn C.lua_rawlen(L voidptr, idx int) int
+fn C.lua_geti(L voidptr, idx int, n i64) int
+fn C.lua_seti(L voidptr, idx int, n i64)

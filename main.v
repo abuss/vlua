@@ -112,5 +112,44 @@ fn main() {
 	println('sum = ${sum}')
 	println('greeting = "${greeting}"')
 
+	// Demo 6: Lua tables
+	println('\n--- Demo 6: Lua Tables ---')
+
+	// Write a numeric table from V and read it back.
+	v_cfg := {
+		'max':  100.0
+		'step': 0.5
+	}
+	set_table_f64(l, 'v_cfg', v_cfg)
+	read_cfg := get_table_f64(l, 'v_cfg')
+	println('v_cfg.max = ${read_cfg['max']}, v_cfg.step = ${read_cfg['step']}')
+
+	// Write a string array from V and read it back.
+	set_array_string(l, 'v_names', ['a', 'b', 'c'])
+	names := get_array_string(l, 'v_names')
+	println('v_names = ${names}')
+
+	// Read a heterogeneous, nested table from examples/demo.lua.
+	safe_dofile(l, 'examples/demo.lua') or {
+		eprintln('Error: $err')
+		return
+	}
+	cfg := get_global_value(l, 'config') or {
+		eprintln('Error: $err')
+		return
+	}
+	println('config.name = "${cfg.children['name'].str}"')
+	println('config.version = ${cfg.children['version'].num}')
+	mut feature_names := []string{}
+	for f in cfg.children['features'].array {
+		feature_names << f.str
+	}
+	mut tag_values := []f64{}
+	for t in cfg.children['tags'].array {
+		tag_values << t.num
+	}
+	println('config.features = ${feature_names}')
+	println('config.tags = ${tag_values}')
+
 	println('\n=== All demos completed successfully! ===')
 }

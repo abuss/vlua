@@ -58,6 +58,37 @@ register_function(l, 'v_add', lua_add)
 safe_dostring(l, 'print(v_add(20, 22))') // prints 42.0
 ```
 
+### Working with Lua tables
+
+Typed helpers for homogeneous tables and arrays (string keys / integer keys `1..#t`):
+
+```v
+set_table_f64(l, 'cfg', {'max': 100.0, 'step': 0.5})
+m := get_table_f64(l, 'cfg') // map[string]f64
+
+set_array_string(l, 'names', ['a', 'b', 'c'])
+names := get_array_string(l, 'names') // []string
+```
+
+For heterogeneous / nested tables, use the general value type `LuaValue`
+(`num`, `str`, `b`, `children map[string]LuaValue`, `array []LuaValue`):
+
+```v
+v := get_global_value(l, 'config') or { panic(err) }
+println(v.children['name'].str) // "vlua"
+println(v.children['tags'].array[0].num) // 10.0
+
+set_global_value(l, 't', LuaValue{
+    kind:     .table
+    children: {'n': LuaValue{kind: .number, num: 7.0}}
+    array:    [LuaValue{kind: .string, str: 'hi'}]
+})
+```
+
+Notes: string keys map to `children`; integer keys `1..#t` map to `array`;
+trailing `nil` array slots are not materialized; `get_global_value` errors on a
+missing/nil global, while the typed helpers return empty containers.
+
 ## Build & Test
 
 ```sh

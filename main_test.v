@@ -149,3 +149,114 @@ fn test_v_function_call() {
 	assert get_global_string(l, 'greeting') == 'Hello, V!'
 	assert C.lua_gettop(l) == 0
 }
+
+fn test_table_f64_roundtrip() {
+	l := new_state() or { panic('Failed to create Lua state') }
+	defer {
+		close_state(l)
+	}
+
+	set_table_f64(l, 't', {
+		'a': 1.5
+		'b': 2.5
+	})
+	m := get_table_f64(l, 't')
+	assert m.len == 2
+	assert m['a'] == 1.5
+	assert m['b'] == 2.5
+	assert C.lua_gettop(l) == 0
+}
+
+fn test_table_string_roundtrip() {
+	l := new_state() or { panic('Failed to create Lua state') }
+	defer {
+		close_state(l)
+	}
+
+	set_table_string(l, 't', {
+		'k1': 'v1'
+		'k2': 'v2'
+	})
+	m := get_table_string(l, 't')
+	assert m.len == 2
+	assert m['k1'] == 'v1'
+	assert m['k2'] == 'v2'
+	assert C.lua_gettop(l) == 0
+}
+
+fn test_array_roundtrip() {
+	l := new_state() or { panic('Failed to create Lua state') }
+	defer {
+		close_state(l)
+	}
+
+	set_array_f64(l, 'a', [1.0, 2.0, 3.0])
+	assert get_array_f64(l, 'a') == [1.0, 2.0, 3.0]
+
+	set_array_string(l, 'b', ['x', 'y'])
+	assert get_array_string(l, 'b') == ['x', 'y']
+	assert C.lua_gettop(l) == 0
+}
+
+fn test_general_value_roundtrip() {
+	l := new_state() or { panic('Failed to create Lua state') }
+	defer {
+		close_state(l)
+	}
+
+	set_global_value(l, 't', LuaValue{
+		kind:     .table
+		children: {
+			'n': LuaValue{
+				kind: .number
+				num:  7.0
+			}
+			's': LuaValue{
+				kind: .string
+				str:  'hi'
+			}
+		}
+		array:    [
+			LuaValue{
+				kind: .number
+				num:  1.0
+			},
+			LuaValue{
+				kind: .string
+				str:  'two'
+			},
+		]
+	})
+
+	safe_dostring(l, 'rt = t.n + t[1]') or { panic('Failed to use table in Lua: $err') }
+	assert get_global_number(l, 'rt') == 8.0
+
+	v := get_global_value(l, 't') or { panic('Failed to read table: $err') }
+	assert v.kind == .table
+	assert v.children['n'].kind == .number
+	assert v.children['n'].num == 7.0
+	assert v.children['s'].str == 'hi'
+	assert v.array.len == 2
+	assert v.array[0].num == 1.0
+	assert v.array[1].str == 'two'
+	assert C.lua_gettop(l) == 0
+}
+
+fn test_missing_table_returns_empty() {
+	l := new_state() or { panic('Failed to create Lua state') }
+	defer {
+		close_state(l)
+	}
+
+	assert get_table_f64(l, 'no_such').len == 0
+	assert get_table_string(l, 'no_such').len == 0
+	assert get_array_f64(l, 'no_such').len == 0
+	assert get_array_string(l, 'no_such').len == 0
+
+	if _ := get_global_value(l, 'no_such') {
+		panic('Expected error for missing global')
+	} else {
+		assert err.msg().contains('nil')
+	}
+	assert C.lua_gettop(l) == 0
+}
