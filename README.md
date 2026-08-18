@@ -21,7 +21,7 @@ dependencies beyond a Lua 5.4 installation.
 ## Requirements
 
 - [V](https://vlang.io) 0.5.x
-- Lua 5.4 headers and library (`liblua5.4` on Linux/macOS, `lua54` on Windows).
+- Lua 5.4 headers and library (`liblua5.4` on Linux/macOS).
 
 ## Usage
 
@@ -178,11 +178,9 @@ v test demo/    # run the test suite
 ## CI
 
 GitHub Actions (`.github/workflows/ci.yml`) runs the test suite on every push
-and on manual dispatch (`workflow_dispatch`) across Ubuntu, macOS and Windows:
-each leg installs Lua 5.4, downloads the pinned V release toolchain (cached per
-version), and runs `v test demo/`. The macOS/Windows legs install Lua via
-Homebrew/Chocolatey and are best-effort — the Ubuntu leg is the reference
-configuration.
+and on manual dispatch (`workflow_dispatch`) across Ubuntu and macOS: each leg
+installs Lua 5.4, downloads the pinned V release toolchain (cached per version),
+and runs `v test demo/`. The Ubuntu leg is the reference configuration.
 
 ## Security note
 
