@@ -3,17 +3,31 @@
 
 module vlua
 
-#include <lua5.4/lua.h>
-#include <lua5.4/lauxlib.h>
-#include <lua5.4/lualib.h>
+// Lua 5.4 headers use a different layout per platform:
+//   Linux (Debian): <lua5.4/lua.h>      library liblua5.4
+//   macOS (Homebrew): <lua/lua.h>       library liblua
+//   Windows (source/vcpkg): <lua.h>     library lua54
+$if macos {
+	#include <lua/lua.h>
+	#include <lua/lauxlib.h>
+	#include <lua/lualib.h>
+} $else $if windows {
+	#include <lua.h>
+	#include <lauxlib.h>
+	#include <lualib.h>
+} $else {
+	#include <lua5.4/lua.h>
+	#include <lua5.4/lauxlib.h>
+	#include <lua5.4/lualib.h>
+}
 
 #flag linux -llua5.4
 #flag darwin -I/usr/local/include
 #flag darwin -I/opt/homebrew/include
 #flag darwin -L/usr/local/lib
 #flag darwin -L/opt/homebrew/lib
-#flag darwin -llua5.4
-#flag windows -llua54
+#flag darwin -llua
+#flag windows -llua
 
 // Minimal Lua C API declarations
 fn C.luaL_newstate() voidptr

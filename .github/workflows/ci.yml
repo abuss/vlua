@@ -23,12 +23,22 @@ jobs:
 
       - name: Install Lua 5.4 (macOS)
         if: runner.os == 'macOS'
-        run: brew install lua
+        run: |
+          brew install lua@5.4
+          echo "VFLAGS=-I$(brew --prefix lua@5.4)/include -L$(brew --prefix lua@5.4)/lib" >> "$GITHUB_ENV"
 
       - name: Install Lua 5.4 (Windows)
         if: runner.os == 'Windows'
-        # best effort: the chocolatey ``lua`` package covers runtime + headers
-        run: choco install lua -y --no-progress
+        shell: bash
+        run: |
+          choco install mingw -y --no-progress
+          echo "C:\ProgramData\chocolatey\lib\mingw\tools\install\mingw64\bin" >> "$GITHUB_PATH"
+          curl -fsSL https://www.lua.org/ftp/lua-5.4.8.tar.gz -o lua.tar.gz
+          tar -xzf lua.tar.gz
+          cd lua-5.4.8
+          mingw32-make all
+          LUA_DIR=$(cygpath -m "$PWD/src")
+          echo "VFLAGS=-I$LUA_DIR -L$LUA_DIR" >> "$GITHUB_ENV"
 
       - name: Read pinned V version (.vvmrc)
         id: ver
@@ -80,11 +90,15 @@ jobs:
           mv "$(ls -d */)" vbin
           echo "$PWD/vbin" >> "$GITHUB_PATH"
 
-      - name: Run test suite (Linux + macOS)
-        if: runner.os != 'Windows'
+      - name: Run test suite (Linux)
+        if: runner.os == 'Linux'
         run: v test demo/
+
+      - name: Run test suite (macOS)
+        if: runner.os == 'macOS'
+        run: v -cflags "$VFLAGS" test demo/
 
       - name: Run test suite (Windows)
         if: runner.os == 'Windows'
         shell: bash
-        run: v test demo/
+        run: v -cflags "$VFLAGS" test demo/
