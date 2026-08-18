@@ -6,21 +6,85 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install Lua 5.4
+      - name: Install Lua 5.4 (Linux)
+        if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y liblua5.4-dev
 
-      - name: Install V compiler
-        run: |
-          git clone --depth=1 https://github.com/vlang/v /tmp/vlang
-          cd /tmp/vlang && make
+      - name: Install Lua 5.4 (macOS)
+        if: runner.os == 'macOS'
+        run: brew install lua
 
-      - name: Run test suite
+      - name: Install Lua 5.4 (Windows)
+        if: runner.os == 'Windows'
+        # best effort: the chocolatey ``lua`` package covers runtime + headers
+        run: choco install lua -y --no-progress
+
+      - name: Read pinned V version (.vvmrc)
+        id: ver
+        shell: bash
         run: |
-          /tmp/vlang/v test demo/
+          echo "ver=$(cat .vvmrc)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache V toolchain
+        uses: actions/cache@v4
+        with:
+          path: v_toolchain
+          key: vlang-${{ runner.os }}-${{ steps.ver.outputs.ver }}
+
+      - name: Install V toolchain (UNIX)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          set -e
+          if [ -x v_toolchain/vbin/v ]; then
+            echo "$PWD/v_toolchain/vbin" >> "$GITHUB_PATH"
+            exit 0
+          fi
+          rm -rf v_toolchain && mkdir v_toolchain && cd v_toolchain
+          ver=$(cat ../.vvmrc)
+          case "$(uname -s)" in
+            Darwin)
+              if [ "$(uname -m)" = "arm64" ]; then a=v_macos_arm64.zip; else a=v_macos_x86_64.zip; fi ;;
+            Linux)
+              if [ "$(uname -m)" = "aarch64" ]; then a=v_linux_arm64.zip; else a=v_linux.zip; fi ;;
+          esac
+          curl -sL "https://github.com/vlang/v/releases/download/$ver/$a" -o v.zip
+          unzip -q v.zip
+          mv "$(ls -d */)" vbin
+          echo "$PWD/vbin" >> "$GITHUB_PATH"
+
+      - name: Install V toolchain (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          set -e
+          if [ -x v_toolchain/vbin/v.exe ]; then
+            echo "$PWD/v_toolchain/vbin" >> "$GITHUB_PATH"
+            exit 0
+          fi
+          rm -rf v_toolchain && mkdir v_toolchain && cd v_toolchain
+          ver=$(cat .vvmrc)
+          curl -sL "https://github.com/vlang/v/releases/download/$ver/v_windows.zip" -o v.zip
+          unzip -q v.zip
+          mv "$(ls -d */)" vbin
+          echo "$PWD/vbin" >> "$GITHUB_PATH"
+
+      - name: Run test suite (Linux + macOS)
+        if: runner.os != 'Windows'
+        run: v test demo/
+
+      - name: Run test suite (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: v test demo/

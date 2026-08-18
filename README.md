@@ -73,19 +73,18 @@ names := vlua.get_array_string(l, 'names') // []string
 ```
 
 For heterogeneous / nested tables, use the general value type `LuaValue`
-(`num`, `str`, `b`, `children map[string]LuaValue`, `array []LuaValue`):
+(`kind` one of `.integer`/`.number`/`.string`/`.boolean`/`.table`, plus `i`,
+`num`, `str`, `b`, `children map[string]LuaValue`, `array []LuaValue`):
 
 ```v
 v := vlua.get_global_value(l, 'config') or { panic(err) }
 println(v.children['name'].str) // "vlua"
-println(v.children['tags'].array[0].num) // 10.0
-
-vlua.set_global_value(l, 't', vlua.LuaValue{
-    kind:     .table
-    children: {'n': vlua.LuaValue{kind: .number, num: 7.0}}
-    array:    [vlua.LuaValue{kind: .string, str: 'hi'}]
-})
+println(v.children['tags'].array[0].i) // 10 (Lua integers keep full precision)
 ```
+
+Integer and float Lua values are preserved separately: Lua integers map to
+`.integer` (`i i64`), floats to `.number` (`num f64`) — so values beyond 2^53
+round-trip losslessly inside tables too.
 
 Notes: string keys map to `children`; integer keys `1..#t` map to `array`;
 trailing `nil` array slots are not materialized; `get_global_value` errors on a
@@ -145,12 +144,45 @@ v := vlua.get_ref(l, tbl_ref) or { panic(err) }
 - `call_ref(l, ref, args)` — call a stored function.
 - `unref_value(l, ref)` — release the handle.
 
+### Compile without running & raising errors from V
+
+Compile Lua source (an anonymous function) without executing it, then run it
+later through `call_ref`:
+
+```v
+ref := vlua.load_string(l, 'return 1 + 2') or { panic(err) }
+res := vlua.call_ref(l, ref, []) or { panic(err) }
+println(res[0].i) // 3 (integer)
+vlua.unref_value(l, ref)
+```
+
+A V function registered with `register_function` can raise a Lua error (caught
+by `pcall` or by `call_function`) with `vlua.raise_lua_error`:
+
+```v
+fn boom(l voidptr) int {
+    _ = vlua.raise_lua_error(l, 'boom from V')
+    return 0
+}
+```
+
 ## Build & Test
+
+The V compiler version is pinned in `.vvmrc` (`0.5.2`).
 
 ```sh
 v run demo/     # run the demo (from anywhere in the project)
 v test demo/    # run the test suite
 ```
+
+## CI
+
+GitHub Actions (`.github/workflows/ci.yml`) runs the test suite on every push
+and on manual dispatch (`workflow_dispatch`) across Ubuntu, macOS and Windows:
+each leg installs Lua 5.4, downloads the pinned V release toolchain (cached per
+version), and runs `v test demo/`. The macOS/Windows legs install Lua via
+Homebrew/Chocolatey and are best-effort — the Ubuntu leg is the reference
+configuration.
 
 ## Security note
 

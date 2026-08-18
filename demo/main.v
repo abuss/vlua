@@ -164,9 +164,9 @@ fn main() {
 	for f in cfg.children['features'].array {
 		feature_names << f.str
 	}
-	mut tag_values := []f64{}
+	mut tag_values := []i64{}
 	for t in cfg.children['tags'].array {
-		tag_values << t.num
+		tag_values << t.i
 	}
 	println('config.features = ${feature_names}')
 	println('config.tags = ${tag_values}')
@@ -230,7 +230,7 @@ fn main() {
 	stats_tbl := stats[0]
 	println('analyze([${nums}]) =')
 	println('  sum   = ${stats_tbl.children['sum'].num}')
-	println('  count = ${stats_tbl.children['count'].num}')
+	println('  count = ${stats_tbl.children['count'].i}')
 	println('  min   = ${stats_tbl.children['min'].num}')
 	println('  max   = ${stats_tbl.children['max'].num}')
 
@@ -283,6 +283,36 @@ fn main() {
 	println('call_ref(math.max, 1, 8, 3) = ${mr[0].num}')
 	vlua.unref_value(l, math_max_ref)
 	vlua.unref_value(l, tbl_ref)
+
+	// Demo 11: Lossless integers, compile-without-run, raising from V
+	println('\n--- Demo 11: Precision, compile-then-run, V errors ---')
+
+	big_tbl := vlua.LuaValue{
+		kind:     .table
+		children: {
+			'big': vlua.LuaValue{
+				kind: .integer
+				i:    i64(9007199254740993)
+			}
+		}
+	}
+	vlua.set_global_value(l, 'num', big_tbl)
+	read_back := vlua.get_global_value(l, 'num') or {
+		eprintln('Error: $err')
+		return
+	}
+	println('table int beyond 2^53   = ${read_back.children['big'].i}')
+
+	chunk_ref := vlua.load_string(l, 'return "compiled, not yet run"') or {
+		eprintln('Error: $err')
+		return
+	}
+	chunk_result := vlua.call_ref(l, chunk_ref, []) or {
+		eprintln('Error: $err')
+		return
+	}
+	println('load_string + call_ref   = "${chunk_result[0].str}"')
+	vlua.unref_value(l, chunk_ref)
 
 	println('\n=== All demos completed successfully! ===')
 }

@@ -237,8 +237,8 @@ fn test_read_lua_created_table() {
 	assert v.children['alpha'].num == 1.5
 	seq := v.children['seq'].array
 	assert seq.len == 2
-	assert seq[0].num == 10.0
-	assert seq[1].num == 20.0
+	assert seq[0].i == i64(10)
+	assert seq[1].i == i64(20)
 	assert C.lua_gettop(l) == 0
 }
 
@@ -427,6 +427,83 @@ fn test_integer_roundtrip() {
 	assert C.lua_gettop(l) == 0
 }
 
+fn test_integer_lua_value() {
+	l := vlua.new_state() or { panic('Failed to create Lua state') }
+	defer {
+		vlua.close_state(l)
+	}
+
+	big := i64(9007199254740993)
+	vlua.set_global_value(l, 't', vlua.LuaValue{
+		kind:     .table
+		children: {
+			'big': vlua.LuaValue{
+				kind: .integer
+				i:    big
+			}
+			'f':   vlua.LuaValue{
+				kind: .number
+				num:  2.5
+			}
+		}
+	})
+
+	v := vlua.get_global_value(l, 't') or { panic(err) }
+	assert v.children['big'].kind == .integer
+	assert v.children['big'].i == big
+	assert v.children['f'].kind == .number
+	assert v.children['f'].num == 2.5
+	assert C.lua_gettop(l) == 0
+}
+
+fn test_load_string() {
+	l := vlua.new_state() or { panic('Failed to create Lua state') }
+	defer {
+		vlua.close_state(l)
+	}
+
+	ref := vlua.load_string(l, 'return 1 + 2') or { panic(err) }
+	res := vlua.call_ref(l, ref, []) or { panic(err) }
+	assert res.len == 1
+	assert res[0].kind == .integer
+	assert res[0].i == i64(3)
+	vlua.unref_value(l, ref)
+
+	if _ := vlua.load_string(l, 'this is not lua') {
+		panic('Expected syntax error')
+	} else {
+		assert err.msg().contains('syntax')
+	}
+	assert C.lua_gettop(l) == 0
+}
+
+// A V function that raises a Lua error via vlua.raise_lua_error.
+fn v_boom(l voidptr) int {
+	_ = vlua.raise_lua_error(l, 'boom from V')
+	return 0
+}
+
+fn test_call_function_raises_lua_error() {
+	l := vlua.new_state() or { panic('Failed to create Lua state') }
+	defer {
+		vlua.close_state(l)
+	}
+
+	vlua.register_function(l, 'v_boom', v_boom)
+
+	if _ := vlua.call_function(l, 'v_boom', []) {
+		panic('Expected error from v_boom')
+	} else {
+		assert err.msg().contains('boom from V')
+	}
+
+	// also catchable from Lua itself via pcall
+	vlua.safe_dostring(l, 'assert(not pcall(v_boom))') or {
+		panic('pcall of v_boom should have failed: $err')
+	}
+	assert C.lua_gettop(l) == 0
+}
+
 fn test_registry_ref() {
 	l := vlua.new_state() or { panic('Failed to create Lua state') }
 	defer {
@@ -525,6 +602,6 @@ fn test_pass_array_get_table() {
 	tbl := res[0]
 	assert tbl.kind == .table
 	assert tbl.children['sum'].num == 8.0
-	assert tbl.children['count'].num == 3.0
+	assert tbl.children['count'].i == i64(3)
 	assert C.lua_gettop(l) == 0
 }

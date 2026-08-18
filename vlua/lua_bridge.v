@@ -8,7 +8,11 @@ module vlua
 #include <lua5.4/lualib.h>
 
 #flag linux -llua5.4
-#flag darwin -L/usr/local/lib -llua5.4
+#flag darwin -I/usr/local/include
+#flag darwin -I/opt/homebrew/include
+#flag darwin -L/usr/local/lib
+#flag darwin -L/opt/homebrew/lib
+#flag darwin -llua5.4
 #flag windows -llua54
 
 // Minimal Lua C API declarations
@@ -17,9 +21,11 @@ fn C.luaL_openlibs(L voidptr)
 fn C.lua_close(L voidptr)
 fn C.luaL_dostring(L voidptr, s &char) int
 fn C.luaL_dofile(L voidptr, filename &char) int
+fn C.luaL_loadstring(L voidptr, s &char) int
 fn C.luaL_ref(L voidptr, t int) int
 fn C.luaL_unref(L voidptr, t int, ref int)
 fn C.lua_pcall(L voidptr, nargs int, nresults int, errfunc int) int
+fn C.lua_error(L voidptr) int
 fn C.lua_getglobal(L voidptr, name &char)
 fn C.lua_getfield(L voidptr, idx int, k &char)
 fn C.lua_setglobal(L voidptr, name &char)
@@ -30,6 +36,7 @@ fn C.lua_next(L voidptr, idx int) int
 fn C.lua_type(L voidptr, idx int) int
 fn C.lua_tonumber(L voidptr, idx int) f64
 fn C.lua_tointeger(L voidptr, idx int) i64
+fn C.lua_isinteger(L voidptr, idx int) int
 fn C.lua_tostring(L voidptr, idx int) &char
 fn C.lua_istable(L voidptr, idx int) int
 fn C.lua_isnil(L voidptr, idx int) int

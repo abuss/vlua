@@ -14,6 +14,7 @@ pub const lua_multret = -1
 
 // General value type for heterogeneous/nested Lua tables.
 pub enum LuaValueKind {
+	integer
 	number
 	string
 	boolean
@@ -23,6 +24,7 @@ pub enum LuaValueKind {
 pub struct LuaValue {
 pub mut:
 	kind     LuaValueKind
+	i        i64
 	num      f64
 	str      string
 	b        bool
@@ -150,6 +152,12 @@ fn read_value_at(l voidptr, idx int) LuaValue {
 	typ := C.lua_type(l, idx)
 	match typ {
 		lua_tnumber {
+			if C.lua_isinteger(l, idx) != 0 {
+				return LuaValue{
+					kind: .integer
+					i:    C.lua_tointeger(l, idx)
+				}
+			}
 			return LuaValue{
 				kind: .number
 				num:  C.lua_tonumber(l, idx)
@@ -212,6 +220,9 @@ fn read_value_at_top(l voidptr) LuaValue {
 // Push a LuaValue onto the Lua stack (recurses into tables).
 fn push_value(l voidptr, v LuaValue) {
 	match v.kind {
+		.integer {
+			C.lua_pushinteger(l, v.i)
+		}
 		.number {
 			C.lua_pushnumber(l, v.num)
 		}
@@ -424,6 +435,25 @@ pub fn call_function(l voidptr, name string, args []LuaValue) ![]LuaValue {
 		return error('global "$name" is not a function')
 	}
 	return call_top_function(l, args)
+}
+
+// Compile Lua source without running it, returning a registry reference to the
+// compiled chunk (callable via call_ref). Errors on a syntax error.
+pub fn load_string(l voidptr, code string) !int {
+	if C.luaL_loadstring(l, code.str) != 0 {
+		msg := lua_error_msg(l)
+		C.lua_pop(l, 1)
+		return error(msg)
+	}
+	return C.luaL_ref(l, lua_registryindex)
+}
+
+// Raise a Lua error from inside a V function registered with
+// register_function. Never returns normally — it longjmps back into Lua, so
+// callers should return right away (use `_ = raise_lua_error(...)`).
+pub fn raise_lua_error(l voidptr, msg string) int {
+	C.lua_pushstring(l, msg.str)
+	return C.lua_error(l)
 }
 
 // Registry index for luaL_ref/luaL_unref. In Lua 5.4 this equals
