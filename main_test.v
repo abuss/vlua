@@ -184,6 +184,29 @@ fn test_table_string_roundtrip() {
 	assert C.lua_gettop(l) == 0
 }
 
+fn test_read_lua_created_table() {
+	l := new_state() or { panic('Failed to create Lua state') }
+	defer {
+		close_state(l)
+	}
+
+	safe_dostring(l, 'lt = { alpha = 1.5, beta = 2.5, seq = { 10, 20 } }') or {
+		panic('Failed to create table in Lua: $err')
+	}
+
+	m := get_table_f64(l, 'lt')
+	assert m['alpha'] == 1.5
+	assert m['beta'] == 2.5
+
+	v := get_global_value(l, 'lt') or { panic(err) }
+	assert v.children['alpha'].num == 1.5
+	seq := v.children['seq'].array
+	assert seq.len == 2
+	assert seq[0].num == 10.0
+	assert seq[1].num == 20.0
+	assert C.lua_gettop(l) == 0
+}
+
 fn test_array_roundtrip() {
 	l := new_state() or { panic('Failed to create Lua state') }
 	defer {
