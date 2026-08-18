@@ -1,0 +1,11 @@
+# opencode tooling config — not part of the project source
+.opencode/
+
+# V build artifacts
+*.o
+*.so
+*.exe
+*.dll
+/bin/
+/tmp/
+/vlua
