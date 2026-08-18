@@ -20,3 +20,14 @@ config = {
 	features = { "auto", "lua" },
 	tags = { 10, 20, 30 },
 }
+
+-- Receives a V array (Demo 8) and returns a Lua table of statistics.
+function analyze(data)
+	local sum, mn, mx = 0, math.huge, -math.huge
+	for _, v in ipairs(data) do
+		sum = sum + v
+		if v < mn then mn = v end
+		if v > mx then mx = v end
+	end
+	return { sum = sum, count = #data, min = mn, max = mx }
+end

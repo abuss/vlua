@@ -155,7 +155,7 @@ fn main() {
 	println('\n--- Demo 7: Calling Lua Functions from V ---')
 
 	// greet() was loaded from examples/demo.lua in Demo 6.
-	greets := call_function(l, 'greet', [LuaValue{kind: .string, str: 'world'}]) or {
+	greets := call_function(l, 'greet', [LuaValue{ kind: .string, str: 'world' }]) or {
 		eprintln('Error: $err')
 		return
 	}
@@ -167,9 +167,9 @@ fn main() {
 		return
 	}
 	maxes := call_function(l, 'max3', [
-		LuaValue{kind: .number, num: 3.0},
-		LuaValue{kind: .number, num: 9.0},
-		LuaValue{kind: .number, num: 5.0},
+		LuaValue{ kind: .number, num: 3.0 },
+		LuaValue{ kind: .number, num: 9.0 },
+		LuaValue{ kind: .number, num: 5.0 },
 	]) or {
 		eprintln('Error: $err')
 		return
@@ -177,13 +177,36 @@ fn main() {
 	println('max3(3, 9, 5) = ${maxes[0].num}')
 
 	adds := call_function(l, 'v_add', [
-		LuaValue{kind: .number, num: 20.0},
-		LuaValue{kind: .number, num: 22.0},
+		LuaValue{ kind: .number, num: 20.0 },
+		LuaValue{ kind: .number, num: 22.0 },
 	]) or {
 		eprintln('Error: $err')
 		return
 	}
 	println('v_add(20, 22) = ${adds[0].num}')
+
+	// Demo 8: Pass a V array to a Lua function, get a Lua table back
+	println('\n--- Demo 8: V Array to Lua, Lua Table Back ---')
+
+	nums := [3.0, 1.0, 4.0, 1.0, 5.0, 9.0]
+	mut num_vals := []LuaValue{}
+	for n in nums {
+		num_vals << LuaValue{
+			kind: .number
+			num:  n
+		}
+	}
+
+	stats := call_function(l, 'analyze', [LuaValue{ kind: .table, array: num_vals }]) or {
+		eprintln('Error: $err')
+		return
+	}
+	stats_tbl := stats[0]
+	println('analyze([${nums}]) =')
+	println('  sum   = ${stats_tbl.children['sum'].num}')
+	println('  count = ${stats_tbl.children['count'].num}')
+	println('  min   = ${stats_tbl.children['min'].num}')
+	println('  max   = ${stats_tbl.children['max'].num}')
 
 	println('\n=== All demos completed successfully! ===')
 }

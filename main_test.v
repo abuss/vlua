@@ -292,8 +292,8 @@ fn test_call_function() {
 
 	register_function(l, 'v_add', lua_add)
 	res := call_function(l, 'v_add', [
-		LuaValue{kind: .number, num: 20.0},
-		LuaValue{kind: .number, num: 22.0},
+		LuaValue{ kind: .number, num: 20.0 },
+		LuaValue{ kind: .number, num: 22.0 },
 	]) or { panic(err) }
 	assert res.len == 1
 	assert res[0].kind == .number
@@ -303,8 +303,8 @@ fn test_call_function() {
 		panic('Failed to define function: $err')
 	}
 	multi := call_function(l, 'pair', [
-		LuaValue{kind: .number, num: 3.0},
-		LuaValue{kind: .number, num: 4.0},
+		LuaValue{ kind: .number, num: 3.0 },
+		LuaValue{ kind: .number, num: 4.0 },
 	]) or { panic(err) }
 	assert multi.len == 2
 	assert multi[0].num == 7.0
@@ -342,5 +342,34 @@ fn test_call_function_errors() {
 	if _ := call_function(l, 'does_not_exist', []) {
 		panic('Expected error for missing global')
 	}
+	assert C.lua_gettop(l) == 0
+}
+
+fn test_pass_array_get_table() {
+	l := new_state() or { panic('Failed to create Lua state') }
+	defer {
+		close_state(l)
+	}
+
+	safe_dostring(l,
+		'function stats(data) local s = 0 for _, v in ipairs(data) do s = s + v end return { sum = s, count = #data } end') or {
+		panic('Failed to define function: $err')
+	}
+
+	nums := [3.0, 1.0, 4.0]
+	mut num_vals := []LuaValue{}
+	for n in nums {
+		num_vals << LuaValue{
+			kind: .number
+			num:  n
+		}
+	}
+
+	res := call_function(l, 'stats', [LuaValue{ kind: .table, array: num_vals }]) or { panic(err) }
+	assert res.len == 1
+	tbl := res[0]
+	assert tbl.kind == .table
+	assert tbl.children['sum'].num == 8.0
+	assert tbl.children['count'].num == 3.0
 	assert C.lua_gettop(l) == 0
 }
