@@ -1,0 +1,26 @@
+name: tests
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Lua 5.4
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y liblua5.4-dev
+
+      - name: Install V compiler
+        run: |
+          git clone --depth=1 https://github.com/vlang/v /tmp/vlang
+          cd /tmp/vlang && make
+
+      - name: Run test suite
+        run: |
+          /tmp/vlang/v test .
