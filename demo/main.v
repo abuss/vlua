@@ -186,12 +186,8 @@ fn main() {
 	}
 	println('greet("world") = "${greets[0].str}"')
 
-	// A Lua function using the math library.
-	vlua.safe_dostring(l, 'function max3(a, b, c) return math.max(a, b, c) end') or {
-		eprintln('Error: $err')
-		return
-	}
-	maxes := vlua.call_function(l, 'max3', [
+	// Dotted path: call math.max directly instead of a wrapper.
+	maxes := vlua.call_function(l, 'math.max', [
 		vlua.LuaValue{ kind: .number, num: 3.0 },
 		vlua.LuaValue{ kind: .number, num: 9.0 },
 		vlua.LuaValue{ kind: .number, num: 5.0 },
@@ -199,7 +195,7 @@ fn main() {
 		eprintln('Error: $err')
 		return
 	}
-	println('max3(3, 9, 5) = ${maxes[0].num}')
+	println('math.max(3, 9, 5) = ${maxes[0].num}')
 
 	adds := vlua.call_function(l, 'v_add', [
 		vlua.LuaValue{ kind: .number, num: 20.0 },
@@ -237,6 +233,56 @@ fn main() {
 	println('  count = ${stats_tbl.children['count'].num}')
 	println('  min   = ${stats_tbl.children['min'].num}')
 	println('  max   = ${stats_tbl.children['max'].num}')
+
+	// Demo 9: Integers
+	println('\n--- Demo 9: Integers ---')
+
+	big := i64(9007199254740993)
+	vlua.set_global_integer(l, 'big', big)
+	vlua.safe_dostring(l, 'bigp1 = big + 1') or {
+		eprintln('Error: $err')
+		return
+	}
+	println('big (beyond 2^53)       = ${vlua.get_global_integer(l, 'big')}')
+	println('big + 1 (from Lua)      = ${vlua.get_global_integer(l, 'bigp1')}')
+
+	// Demo 10: Registry references
+	println('\n--- Demo 10: Registry References ---')
+
+	tbl_ref := vlua.ref_value(l, vlua.LuaValue{
+		kind:     .table
+		children: {
+			'answer': vlua.LuaValue{
+				kind: .number
+				num:  42.0
+			}
+		}
+	}) or {
+		eprintln('Error: $err')
+		return
+	}
+	fetched := vlua.get_ref(l, tbl_ref) or {
+		eprintln('Error: $err')
+		return
+	}
+	println('ref table -> answer = ${fetched.children['answer'].num}')
+
+	// Hold a function by reference and call it later.
+	math_max_ref := vlua.ref_global(l, 'math.max') or {
+		eprintln('Error: $err')
+		return
+	}
+	mr := vlua.call_ref(l, math_max_ref, [
+		vlua.LuaValue{ kind: .number, num: 1.0 },
+		vlua.LuaValue{ kind: .number, num: 8.0 },
+		vlua.LuaValue{ kind: .number, num: 3.0 },
+	]) or {
+		eprintln('Error: $err')
+		return
+	}
+	println('call_ref(math.max, 1, 8, 3) = ${mr[0].num}')
+	vlua.unref_value(l, math_max_ref)
+	vlua.unref_value(l, tbl_ref)
 
 	println('\n=== All demos completed successfully! ===')
 }

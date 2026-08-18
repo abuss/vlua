@@ -106,9 +106,44 @@ res := vlua.call_function(l, 'pair', [
 ]) or { panic(err) } // res[0] == 7.0, res[1] == 12.0
 ```
 
-`call_function` takes the global function name and a `[]LuaValue` of arguments,
-and returns the values in order. It errors if the global is not a function or the
-call raises an error.
+`call_function` takes a global name or dotted path (e.g. `math.max`) and a
+`[]LuaValue` of arguments, and returns the values in order. It errors if the
+target is not a function or the call raises an error.
+
+### Integers
+
+Lua values that are integers (not floats) round-trip losslessly, even beyond
+2^53 where `f64` would lose precision:
+
+```v
+vlua.set_global_integer(l, 'big', i64(9007199254740993))
+vlua.safe_dostring(l, 'big1 = big + 1') or { panic(err) }
+vlua.get_global_integer(l, 'big1') == i64(9007199254740994)
+```
+
+`get_global_integer` returns 0 when the value is not an integer-valued number.
+
+### Holding Lua values with registry references
+
+`ref_value`/`ref_global` store a value (including functions and tables) in the
+Lua registry and return an integer handle — no global name needed:
+
+```v
+ref := vlua.ref_global(l, 'math.max') or { panic(err) }
+res := vlua.call_ref(l, ref, [vlua.LuaValue{kind: .number, num: 1.0}, ...]) or { panic(err) }
+vlua.unref_value(l, ref) // release the handle
+```
+
+```v
+tbl_ref := vlua.ref_value(l, vlua.LuaValue{kind: .table, ...}) or { panic(err) }
+v := vlua.get_ref(l, tbl_ref) or { panic(err) }
+```
+
+- `ref_value(l, v)` — store any `LuaValue`, return the handle.
+- `ref_global(l, name)` — store a global / dotted-path value, return the handle.
+- `get_ref(l, ref)` — fetch a stored value back.
+- `call_ref(l, ref, args)` — call a stored function.
+- `unref_value(l, ref)` — release the handle.
 
 ## Build & Test
 

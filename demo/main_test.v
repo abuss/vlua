@@ -380,6 +380,121 @@ fn test_call_function_errors() {
 	assert C.lua_gettop(l) == 0
 }
 
+fn test_call_function_dotted() {
+	l := vlua.new_state() or { panic('Failed to create Lua state') }
+	defer {
+		vlua.close_state(l)
+	}
+
+	res := vlua.call_function(l, 'math.max', [
+		vlua.LuaValue{ kind: .number, num: 3.0 },
+		vlua.LuaValue{ kind: .number, num: 9.0 },
+		vlua.LuaValue{ kind: .number, num: 5.0 },
+	]) or { panic(err) }
+	assert res.len == 1
+	assert res[0].num == 9.0
+
+	// dotted path resolving to a non-function (math.pi is a number)
+	if _ := vlua.call_function(l, 'math.pi', []) {
+		panic('Expected error for non-function dotted target')
+	} else {
+		assert err.msg().contains('not a function')
+	}
+
+	// deep missing path
+	if _ := vlua.call_function(l, 'math.missing_fn', []) {
+		panic('Expected error for missing dotted target')
+	}
+	assert C.lua_gettop(l) == 0
+}
+
+fn test_integer_roundtrip() {
+	l := vlua.new_state() or { panic('Failed to create Lua state') }
+	defer {
+		vlua.close_state(l)
+	}
+
+	// a value beyond 2^53 proves the integer path (f64 would lose precision)
+	big := i64(9007199254740993)
+	vlua.set_global_integer(l, 'big', big)
+	assert vlua.get_global_integer(l, 'big') == big
+
+	vlua.safe_dostring(l, 'big1 = big + 1') or { panic('Failed to run Lua: $err') }
+	assert vlua.get_global_integer(l, 'big1') == big + 1
+
+	vlua.safe_dostring(l, 'f = 3.5') or { panic('Failed to run Lua: $err') }
+	assert vlua.get_global_integer(l, 'f') == 0
+	assert C.lua_gettop(l) == 0
+}
+
+fn test_registry_ref() {
+	l := vlua.new_state() or { panic('Failed to create Lua state') }
+	defer {
+		vlua.close_state(l)
+	}
+
+	ref := vlua.ref_value(l, vlua.LuaValue{
+		kind:     .table
+		children: {
+			'x': vlua.LuaValue{
+				kind: .number
+				num:  5.0
+			}
+		}
+	}) or { panic(err) }
+
+	v := vlua.get_ref(l, ref) or { panic(err) }
+	assert v.kind == .table
+	assert v.children['x'].num == 5.0
+
+	vlua.unref_value(l, ref)
+
+	// an unused registry slot errors on fetch
+	if _ := vlua.get_ref(l, 999999) {
+		panic('Expected error for invalid reference')
+	} else {
+		assert err.msg().contains('no such reference')
+	}
+	assert C.lua_gettop(l) == 0
+}
+
+fn test_call_referenced_function() {
+	l := vlua.new_state() or { panic('Failed to create Lua state') }
+	defer {
+		vlua.close_state(l)
+	}
+
+	vlua.safe_dostring(l, 'function cube(x) return x * x * x end') or {
+		panic('Failed to define function: $err')
+	}
+	ref := vlua.ref_global(l, 'cube') or { panic(err) }
+
+	res := vlua.call_ref(l, ref, [vlua.LuaValue{ kind: .number, num: 3.0 }]) or { panic(err) }
+	assert res.len == 1
+	assert res[0].num == 27.0
+
+	// ref a dotted function and call it
+	max_ref := vlua.ref_global(l, 'math.max') or { panic(err) }
+	maxes := vlua.call_ref(l, max_ref, [
+		vlua.LuaValue{ kind: .number, num: 1.0 },
+		vlua.LuaValue{ kind: .number, num: 7.0 },
+	]) or { panic(err) }
+	assert maxes[0].num == 7.0
+
+	// calling a non-function reference errors
+	vlua.set_global_number(l, 'some_num', 42.0)
+	num_ref := vlua.ref_global(l, 'some_num') or { panic(err) }
+	if _ := vlua.call_ref(l, num_ref, []) {
+		panic('expected error for function call on number ref')
+	} else {
+		assert err.msg().contains('not a function')
+	}
+	vlua.unref_value(l, ref)
+	vlua.unref_value(l, max_ref)
+	vlua.unref_value(l, num_ref)
+	assert C.lua_gettop(l) == 0
+}
+
 fn test_pass_array_get_table() {
 	l := vlua.new_state() or { panic('Failed to create Lua state') }
 	defer {

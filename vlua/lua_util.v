@@ -103,6 +103,19 @@ pub fn get_global_number(l voidptr, name string) f64 {
 	return n
 }
 
+// Get a global variable as integer. Lua returns this losslessly for integer
+// values; floats that are not integers and non-numeric values yield 0.
+pub fn get_global_integer(l voidptr, name string) i64 {
+	C.lua_getglobal(l, name.str)
+	if C.lua_isnil(l, -1) != 0 {
+		C.lua_pop(l, 1)
+		return 0
+	}
+	n := C.lua_tointeger(l, -1)
+	C.lua_pop(l, 1)
+	return n
+}
+
 // Set a global variable
 pub fn set_global(l voidptr, name string, value string) {
 	C.lua_pushstring(l, value.str)
@@ -121,6 +134,12 @@ pub fn register_function(l voidptr, name string, f fn (voidptr) int) {
 // Set a global number
 pub fn set_global_number(l voidptr, name string, value f64) {
 	C.lua_pushnumber(l, value)
+	C.lua_setglobal(l, name.str)
+}
+
+// Set a global integer
+pub fn set_global_integer(l voidptr, name string, value i64) {
+	C.lua_pushinteger(l, value)
 	C.lua_setglobal(l, name.str)
 }
 
@@ -364,14 +383,20 @@ pub fn set_global_value(l voidptr, name string, v LuaValue) {
 	C.lua_setglobal(l, name.str)
 }
 
-// Call a global Lua function with the given arguments and collect its
-// return values. Errors if the global is not a function or the call fails.
-pub fn call_function(l voidptr, name string, args []LuaValue) ![]LuaValue {
-	C.lua_getglobal(l, name.str)
-	if C.lua_type(l, -1) != lua_tfunction {
-		C.lua_pop(l, 1)
-		return error('global "$name" is not a function')
+// Look up a global or a dotted path (`math.max`) and leave the value on the
+// top of the Lua stack.
+fn push_dotted(l voidptr, name string) {
+	parts := name.split('.')
+	C.lua_getglobal(l, parts[0].str)
+	for i in 1 .. parts.len {
+		C.lua_getfield(l, -1, parts[i].str)
+		C.lua_remove(l, -2)
 	}
+}
+
+// Call the function currently on top of the Lua stack with `args` and collect
+// its return values in order.
+fn call_top_function(l voidptr, args []LuaValue) ![]LuaValue {
 	for a in args {
 		push_value(l, a)
 	}
@@ -387,4 +412,69 @@ pub fn call_function(l voidptr, name string, args []LuaValue) ![]LuaValue {
 	}
 	C.lua_pop(l, n)
 	return results
+}
+
+// Call a global (or dotted-path, e.g. `math.max`) Lua function with the given
+// arguments and collect its return values. Errors if the global is not a
+// function or the call fails.
+pub fn call_function(l voidptr, name string, args []LuaValue) ![]LuaValue {
+	push_dotted(l, name)
+	if C.lua_type(l, -1) != lua_tfunction {
+		C.lua_pop(l, 1)
+		return error('global "$name" is not a function')
+	}
+	return call_top_function(l, args)
+}
+
+// Registry index for luaL_ref/luaL_unref. In Lua 5.4 this equals
+// `-LUAI_MAXSTACK - 1000`; the standard build uses LUAI_MAXSTACK = 1000000.
+pub const lua_registryindex = -1001000
+
+// Store a LuaValue in the Lua registry, returning a non-negative handle that
+// keeps the value alive without a global name. Errors if the value is nil.
+pub fn ref_value(l voidptr, v LuaValue) !int {
+	push_value(l, v)
+	ref := C.luaL_ref(l, lua_registryindex)
+	if ref == -1 {
+		return error('cannot refer nil value')
+	}
+	return ref
+}
+
+// Store the global (or dotted path) value in the registry.
+pub fn ref_global(l voidptr, name string) !int {
+	push_dotted(l, name)
+	if C.lua_type(l, -1) == lua_tnil {
+		C.lua_pop(l, 1)
+		return error('global "$name" is nil or missing')
+	}
+	return C.luaL_ref(l, lua_registryindex)
+}
+
+// Fetch a registered value back. Errors if the reference is not valid.
+pub fn get_ref(l voidptr, ref int) !LuaValue {
+	C.lua_rawgeti(l, lua_registryindex, ref)
+	if C.lua_isnil(l, -1) != 0 {
+		C.lua_pop(l, 1)
+		return error('no such reference: $ref')
+	}
+	v := read_value_at(l, -1)
+	C.lua_pop(l, 1)
+	return v
+}
+
+// Remove a value from the registry, releasing the reference.
+pub fn unref_value(l voidptr, ref int) {
+	C.luaL_unref(l, lua_registryindex, ref)
+}
+
+// Call a registered function. Errors if the reference is invalid or not a
+// function, or the call raises an error.
+pub fn call_ref(l voidptr, ref int, args []LuaValue) ![]LuaValue {
+	C.lua_rawgeti(l, lua_registryindex, ref)
+	if C.lua_type(l, -1) != lua_tfunction {
+		C.lua_pop(l, 1)
+		return error('reference $ref is not a function')
+	}
+	return call_top_function(l, args)
 }
