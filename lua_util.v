@@ -38,6 +38,17 @@ pub fn safe_dostring(l voidptr, code string) !string {
 	return ''
 }
 
+// Execute a Lua file safely
+pub fn safe_dofile(l voidptr, filename string) !string {
+	ret := C.luaL_dofile(l, filename.str)
+	if ret != 0 {
+		msg := lua_error_msg(l)
+		C.lua_pop(l, 1)
+		return error(msg)
+	}
+	return ''
+}
+
 // Get a global variable as string
 pub fn get_global_string(l voidptr, name string) string {
 	C.lua_getglobal(l, name.str)
@@ -68,6 +79,15 @@ pub fn get_global_number(l voidptr, name string) f64 {
 // Set a global variable
 pub fn set_global(l voidptr, name string, value string) {
 	C.lua_pushstring(l, value.str)
+	C.lua_setglobal(l, name.str)
+}
+
+// Register a V function as a callable Lua global.
+// The function must have the signature `fn (l voidptr) int`: it reads its
+// arguments from the Lua stack by index and returns the number of results
+// it pushed back onto the stack.
+pub fn register_function(l voidptr, name string, f fn (voidptr) int) {
+	C.lua_pushcfunction(l, f)
 	C.lua_setglobal(l, name.str)
 }
 

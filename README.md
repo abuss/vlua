@@ -14,8 +14,9 @@ dependencies beyond a Lua 5.4 installation.
 | ----------------- | -------------------------------------------------------------- |
 | `lua_bridge.v`    | FFI declarations for the Lua C API (linking, C functions).     |
 | `lua_util.v`      | High-level helpers: state lifecycle, safe execution, globals.  |
-| `main.v`          | Executable demo showing the three usage patterns.              |
-| `main_test.v`     | Test suite; run with `v test .`.                               |
+| `main.v`          | Executable demo showing the usage patterns.                    |
+| `main_test.v`     | Test suite; run with `v test .`.                             |
+| `examples/demo.lua` | Sample external Lua script loaded by the demo and tests. |
 
 ## Requirements
 
@@ -34,6 +35,27 @@ safe_dostring(l, 'print("Hello from Lua!")') or {
 
 set_global(l, 'name', 'world')
 println(get_global_string(l, 'name'))
+
+// Execute an external Lua file
+safe_dofile(l, 'examples/demo.lua') or {
+    eprintln('error: $err')
+}
+println(get_global_number(l, 'answer')) // 42.0
+```
+
+### Calling V functions from Lua
+
+```v
+// a Lua-callable V function: reads args from the Lua stack, returns # of results
+fn lua_add(l voidptr) int {
+    a := C.lua_tonumber(l, 1)
+    b := C.lua_tonumber(l, 2)
+    C.lua_pushnumber(l, a + b)
+    return 1
+}
+
+register_function(l, 'v_add', lua_add)
+safe_dostring(l, 'print(v_add(20, 22))') // prints 42.0
 ```
 
 ## Build & Test

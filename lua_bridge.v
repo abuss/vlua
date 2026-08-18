@@ -16,6 +16,7 @@ fn C.luaL_newstate() voidptr
 fn C.luaL_openlibs(L voidptr)
 fn C.lua_close(L voidptr)
 fn C.luaL_dostring(L voidptr, s &char) int
+fn C.luaL_dofile(L voidptr, filename &char) int
 fn C.lua_pcall(L voidptr, nargs int, nresults int, errfunc int) int
 fn C.lua_getglobal(L voidptr, name &char)
 fn C.lua_setglobal(L voidptr, name &char)
@@ -37,6 +38,7 @@ fn C.lua_pushnumber(L voidptr, n f64)
 fn C.lua_pushinteger(L voidptr, n i64)
 fn C.lua_pushstring(L voidptr, s &char)
 fn C.lua_pushboolean(L voidptr, b bool)
+fn C.lua_pushcfunction(L voidptr, f fn (voidptr) int)
 fn C.lua_toboolean(L voidptr, idx int) int
 fn C.lua_gettop(L voidptr) int
 fn C.lua_objlen(L voidptr, idx int) int

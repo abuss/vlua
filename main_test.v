@@ -115,3 +115,37 @@ fn test_syntax_error() {
 
 	assert C.lua_gettop(l) == 0
 }
+
+fn test_external_file() {
+	l := new_state() or { panic('Failed to create Lua state') }
+	defer {
+		close_state(l)
+	}
+
+	safe_dofile(l, 'examples/demo.lua') or { panic('Failed to execute Lua file: $err') }
+
+	assert get_global_string(l, 'script_name') == 'demo.lua'
+	assert get_global_number(l, 'answer') == 42.0
+	assert get_global_number(l, 'pi') == 3.14159
+
+	safe_dostring(l, 'greet_result = greet("V")') or { panic('Failed to call Lua function: $err') }
+	assert get_global_string(l, 'greet_result') == 'Hello, V!'
+	assert C.lua_gettop(l) == 0
+}
+
+fn test_v_function_call() {
+	l := new_state() or { panic('Failed to create Lua state') }
+	defer {
+		close_state(l)
+	}
+
+	register_function(l, 'v_add', lua_add)
+	register_function(l, 'v_greet', lua_greet)
+
+	safe_dostring(l, 'sum = v_add(20, 22)') or { panic('Failed to call V function: $err') }
+	assert get_global_number(l, 'sum') == 42.0
+
+	safe_dostring(l, 'greeting = v_greet("V")') or { panic('Failed to call V function: $err') }
+	assert get_global_string(l, 'greeting') == 'Hello, V!'
+	assert C.lua_gettop(l) == 0
+}
