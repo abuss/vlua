@@ -1,27 +1,27 @@
 // Simple Lua utilities for V
 // Provides basic Lua state management and string conversion
 
-module main
+module vlua
 
 // Lua type ids (luaconf.h)
-const lua_tnil = 0
-const lua_tboolean = 1
-const lua_tnumber = 3
-const lua_tstring = 4
-const lua_ttable = 5
-const lua_tfunction = 6
-const lua_multret = -1
+pub const lua_tnil = 0
+pub const lua_tboolean = 1
+pub const lua_tnumber = 3
+pub const lua_tstring = 4
+pub const lua_ttable = 5
+pub const lua_tfunction = 6
+pub const lua_multret = -1
 
 // General value type for heterogeneous/nested Lua tables.
-enum LuaValueKind {
+pub enum LuaValueKind {
 	number
 	string
 	boolean
 	table
 }
 
-struct LuaValue {
-mut:
+pub struct LuaValue {
+pub mut:
 	kind     LuaValueKind
 	num      f64
 	str      string

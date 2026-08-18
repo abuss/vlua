@@ -8,4 +8,5 @@
 *.dll
 /bin/
 /tmp/
-/vlua
+/vlua_demo
+/demo/demo

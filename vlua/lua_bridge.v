@@ -1,7 +1,7 @@
 // Simple Lua FFI wrapper for V
 // Uses raw C calls with minimal abstraction
 
-module main
+module vlua
 
 #include <lua5.4/lua.h>
 #include <lua5.4/lauxlib.h>
